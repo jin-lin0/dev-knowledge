@@ -1,0 +1,70 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface RelatedItem {
+  description: string;
+  href: string;
+  title: string;
+}
+
+interface NextItem {
+  href: string;
+  title: string;
+}
+
+interface Props {
+  headings: Heading[];
+  next?: NextItem;
+  related: RelatedItem[];
+}
+
+const { headings, next, related } = Astro.props;
+const visibleHeadings = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+---
+
+<aside class="context-rail" aria-label="文档上下文">
+  <div class="context-rail__inner">
+    {visibleHeadings.length > 0 && (
+      <section class="toc" aria-label="本页目录">
+        <p>本页内容</p>
+        <nav>
+          <ul>
+            {visibleHeadings.map((heading) => (
+              <li class:list={{ nested: heading.depth === 3 }}>
+                <a href={`#${heading.slug}`} data-toc-link={heading.slug}>{heading.text}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </section>
+    )}
+
+    {related.length > 0 && (
+      <section class="rail-related" aria-labelledby="rail-related-title">
+        <p id="rail-related-title">相关文档</p>
+        <ul>
+          {related.map((item) => (
+            <li>
+              <a href={item.href} title={item.description}>
+                <i class="ph ph-file-text" aria-hidden="true"></i>
+                <span>{item.title}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    {next && (
+      <a class="rail-next" href={next.href}>
+        <span>下一篇</span>
+        <strong>{next.title}</strong>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+      </a>
+    )}
+  </div>
+</aside>

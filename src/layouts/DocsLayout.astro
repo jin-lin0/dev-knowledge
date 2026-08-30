@@ -1,0 +1,222 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import DisplaySettings from '../components/DisplaySettings.astro';
+import Search from '../components/Search.astro';
+import Sidebar from '../components/Sidebar.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+import { buildNavigation, flattenNavigation, getDocHref, type DocEntry } from '../lib/docs';
+import '@phosphor-icons/web/regular';
+import '../styles/global.css';
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  currentPath: string;
+  docs: DocEntry[];
+  entry: CollectionEntry<'docs'>;
+  headings: Heading[];
+}
+
+const { currentPath, docs, entry, headings } = Astro.props;
+const groups = buildNavigation(docs);
+const flatItems = flattenNavigation(groups);
+const currentIndex = flatItems.findIndex((item) => item.href === currentPath);
+const next = currentIndex >= 0 && currentIndex < flatItems.length - 1
+  ? flatItems[currentIndex + 1]
+  : flatItems.find((item) => item.id === 'start-here' && item.href !== currentPath);
+const related = ['start-here', 'writing-guide']
+  .map((id) => docs.find((doc) => doc.id === id))
+  .filter((doc): doc is DocEntry => Boolean(doc) && doc?.id !== entry.id)
+  .map((doc) => ({
+    href: getDocHref(doc.id),
+    title: doc.data.title,
+    description: doc.data.description ?? '',
+  }));
+const currentGroup = groups.find((group) => group.items.some((item) => item.href === currentPath));
+const canonicalUrl = new URL(currentPath, Astro.site);
+const kindLabels = {
+  note: '速记知识',
+  tutorial: '教程',
+  'how-to': '操作指南',
+  reference: '参考资料',
+  explanation: '原理解释',
+} as const;
+const documentKind = entry.data.kind ? kindLabels[entry.data.kind] : undefined;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={entry.data.description ?? entry.data.title} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{entry.data.title} · Dev Knowledge</title>
+    <script is:inline>
+      (() => {
+        const themeSetting = localStorage.getItem('dev-knowledge-theme-setting') || 'system';
+        const theme = themeSetting === 'system'
+          ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : themeSetting;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.fontSize = localStorage.getItem('dev-knowledge-font-size') || 'standard';
+        document.documentElement.dataset.sidebar = localStorage.getItem('dev-knowledge-sidebar') || 'expanded';
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-area">
+        <button class="sidebar-toggle" type="button" data-nav-toggle aria-controls="docs-sidebar" aria-expanded="false" aria-label="切换文档导航">
+          <i class="ph ph-list" aria-hidden="true"></i>
+        </button>
+        <a class="brand" href="/" aria-label="Dev Knowledge 文档首页">
+          <span class="brand__icon"><i class="ph ph-book-open" aria-hidden="true"></i></span>
+          <span class="brand__name">Dev Knowledge</span>
+          <span class="version-badge">V2.0</span>
+        </a>
+      </div>
+      <div class="topbar__center">
+        <Search />
+      </div>
+      <div class="topbar__actions">
+        <DisplaySettings />
+      </div>
+    </header>
+
+    <div class="docs-shell">
+      <Sidebar groups={groups} currentPath={currentPath} />
+
+      <main class="document">
+        <div class="document__inner">
+          <div class="breadcrumb">
+            <span>{currentGroup?.label ?? '文档'}</span>
+            <i class="ph ph-caret-right" aria-hidden="true"></i>
+            <span>{entry.data.title}</span>
+          </div>
+
+          <header class="document__header">
+            <h1>{entry.data.title}</h1>
+            {entry.data.description && <p>{entry.data.description}</p>}
+            {(documentKind || entry.data.audience || entry.data.lastVerified) && (
+              <dl class="document-meta">
+                {documentKind && (
+                  <div>
+                    <dt>类型</dt>
+                    <dd>{documentKind}</dd>
+                  </div>
+                )}
+                {entry.data.audience && (
+                  <div>
+                    <dt>适合读者</dt>
+                    <dd>{entry.data.audience}</dd>
+                  </div>
+                )}
+                {entry.data.lastVerified && (
+                  <div>
+                    <dt>最近核验</dt>
+                    <dd><time datetime={entry.data.lastVerified}>{entry.data.lastVerified}</time></dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </header>
+
+          <article class="prose" data-document-content>
+            <slot />
+          </article>
+
+          {related.length > 0 && (
+            <section class="related-docs" aria-labelledby="related-title">
+              <h2 id="related-title">关联文档</h2>
+              <div class="related-docs__grid">
+                {related.map((item) => (
+                  <a href={item.href}>
+                    <strong>{item.title}</strong>
+                    <span>{item.description}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {next && (
+            <nav class="pager" aria-label="文档翻页">
+                <a href={next.href} class="pager__next">
+                  <span>下一篇 / NEXT</span>
+                  <strong>{next.title}</strong>
+                  <i class="ph ph-arrow-right" aria-hidden="true"></i>
+                </a>
+            </nav>
+          )}
+        </div>
+      </main>
+
+      <TableOfContents headings={headings} related={related} next={next} />
+    </div>
+
+    <script>
+      const navToggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]');
+      const backdrop = document.querySelector<HTMLElement>('[data-nav-backdrop]');
+      const setNavigation = (open: boolean) => {
+        document.body.classList.toggle('nav-open', open);
+        navToggle?.setAttribute('aria-expanded', String(open));
+        navToggle?.setAttribute('aria-label', open ? '关闭文档导航' : '打开文档导航');
+      };
+      if (navToggle && matchMedia('(min-width: 761px)').matches) {
+        const expanded = document.documentElement.dataset.sidebar !== 'collapsed';
+        navToggle.setAttribute('aria-expanded', String(expanded));
+        navToggle.setAttribute('aria-label', expanded ? '收起文档导航' : '展开文档导航');
+      }
+      navToggle?.addEventListener('click', () => {
+        if (matchMedia('(min-width: 761px)').matches) {
+          const collapsed = document.documentElement.dataset.sidebar !== 'collapsed';
+          document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
+          localStorage.setItem('dev-knowledge-sidebar', collapsed ? 'collapsed' : 'expanded');
+          navToggle.setAttribute('aria-expanded', String(!collapsed));
+          navToggle.setAttribute('aria-label', collapsed ? '展开文档导航' : '收起文档导航');
+          return;
+        }
+        setNavigation(!document.body.classList.contains('nav-open'));
+      });
+      backdrop?.addEventListener('click', () => setNavigation(false));
+
+      const article = document.querySelector<HTMLElement>('[data-document-content]');
+      article?.querySelectorAll('pre').forEach((pre) => {
+        const button = document.createElement('button');
+        const icon = document.createElement('i');
+        const label = document.createElement('span');
+        button.className = 'copy-code';
+        button.type = 'button';
+        icon.className = 'ph ph-copy';
+        icon.setAttribute('aria-hidden', 'true');
+        label.textContent = 'Copy';
+        button.append(icon, label);
+        button.addEventListener('click', async () => {
+          const code = pre.querySelector('code')?.textContent ?? '';
+          await navigator.clipboard.writeText(code);
+          label.textContent = 'Copied';
+          window.setTimeout(() => { label.textContent = 'Copy'; }, 1400);
+        });
+        pre.append(button);
+      });
+
+      const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
+      const observedHeadings = Array.from(article?.querySelectorAll<HTMLElement>('h2[id], h3[id]') ?? []);
+      if (tocLinks.length > 0 && observedHeadings.length > 0) {
+        const observer = new IntersectionObserver((entries) => {
+          const visible = entries.find((item) => item.isIntersecting);
+          if (!visible) return;
+          tocLinks.forEach((link) => link.classList.toggle('active', link.dataset.tocLink === visible.target.id));
+        }, { rootMargin: '-96px 0px -72% 0px' });
+        observedHeadings.forEach((heading) => observer.observe(heading));
+      }
+    </script>
+  </body>
+</html>

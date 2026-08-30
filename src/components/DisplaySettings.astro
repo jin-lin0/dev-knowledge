@@ -1,0 +1,115 @@
+<div class="display-settings">
+  <button
+    class="settings-toggle"
+    type="button"
+    data-settings-toggle
+    aria-expanded="false"
+    aria-controls="display-settings-panel"
+    aria-label="显示设置"
+  >
+    <i class="ph ph-gear" aria-hidden="true"></i>
+  </button>
+
+  <section class="settings-panel" id="display-settings-panel" data-settings-panel hidden>
+    <header>
+      <strong>显示设置</strong>
+      <button type="button" data-settings-close aria-label="关闭显示设置">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    <fieldset>
+      <legend>字体大小</legend>
+      <div class="segmented-control" data-font-size-control>
+        <button type="button" data-font-size="small">小</button>
+        <button type="button" data-font-size="standard">标准</button>
+        <button type="button" data-font-size="large">大</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>主题</legend>
+      <div class="segmented-control segmented-control--theme" data-theme-control>
+        <button type="button" data-theme-value="light"><i class="ph ph-sun" aria-hidden="true"></i>浅色</button>
+        <button type="button" data-theme-value="dark"><i class="ph ph-moon" aria-hidden="true"></i>深色</button>
+        <button type="button" data-theme-value="system"><i class="ph ph-monitor" aria-hidden="true"></i>系统</button>
+      </div>
+    </fieldset>
+  </section>
+</div>
+
+<script>
+  const settingsToggle = document.querySelector<HTMLButtonElement>('[data-settings-toggle]');
+  const settingsPanel = document.querySelector<HTMLElement>('[data-settings-panel]');
+  const settingsClose = document.querySelector<HTMLButtonElement>('[data-settings-close]');
+  const fontButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-font-size]'));
+  const themeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-theme-value]'));
+
+  const storedFontSize = localStorage.getItem('dev-knowledge-font-size') ?? 'standard';
+  let currentThemeSetting = localStorage.getItem('dev-knowledge-theme-setting') ?? 'system';
+
+  const syncControls = () => {
+    const currentFontSize = document.documentElement.dataset.fontSize ?? 'standard';
+    fontButtons.forEach((button) => {
+      const selected = button.dataset.fontSize === currentFontSize;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    themeButtons.forEach((button) => {
+      const selected = button.dataset.themeValue === currentThemeSetting;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+  };
+
+  const setPanelOpen = (open: boolean) => {
+    if (!settingsPanel || !settingsToggle) return;
+    settingsPanel.hidden = !open;
+    settingsToggle.setAttribute('aria-expanded', String(open));
+    if (open) syncControls();
+  };
+
+  const applyTheme = (value: string) => {
+    const resolved = value === 'system'
+      ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : value;
+    document.documentElement.dataset.theme = resolved;
+    currentThemeSetting = value;
+    localStorage.setItem('dev-knowledge-theme-setting', value);
+  };
+
+  document.documentElement.dataset.fontSize = storedFontSize;
+  applyTheme(currentThemeSetting);
+  syncControls();
+
+  settingsToggle?.addEventListener('click', () => setPanelOpen(settingsPanel?.hidden ?? true));
+  settingsClose?.addEventListener('click', () => setPanelOpen(false));
+
+  fontButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = button.dataset.fontSize ?? 'standard';
+      document.documentElement.dataset.fontSize = value;
+      localStorage.setItem('dev-knowledge-font-size', value);
+      syncControls();
+    });
+  });
+
+  themeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = button.dataset.themeValue ?? 'system';
+      localStorage.setItem('dev-knowledge-theme-setting', value);
+      applyTheme(value);
+      syncControls();
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (settingsPanel?.hidden) return;
+    const target = event.target as Node;
+    if (!settingsPanel?.contains(target) && !settingsToggle?.contains(target)) setPanelOpen(false);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setPanelOpen(false);
+  });
+</script>

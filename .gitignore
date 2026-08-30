@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# generated files
+.astro/
+dist/
+
+# deployment state
+.vercel/
+
+# local files
+.DS_Store
+*.log

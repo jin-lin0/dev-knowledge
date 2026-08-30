@@ -1,0 +1,34 @@
+---
+import type { NavGroup } from '../lib/docs';
+
+interface Props {
+  currentPath: string;
+  groups: NavGroup[];
+}
+
+const { currentPath, groups } = Astro.props;
+---
+
+<div class="nav-backdrop" data-nav-backdrop></div>
+<aside class="sidebar" id="docs-sidebar" aria-label="文档导航">
+  <nav class="sidebar__inner">
+    {groups.map((group) => (
+      <section class="nav-group">
+        <h2>{group.label}</h2>
+        <ul>
+          {group.items.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                class:list={{ active: currentPath === item.href }}
+                aria-current={currentPath === item.href ? 'page' : undefined}
+              >
+                <span>{item.title}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </nav>
+</aside>
