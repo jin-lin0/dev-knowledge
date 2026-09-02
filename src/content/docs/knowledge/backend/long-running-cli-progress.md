@@ -3,6 +3,7 @@ title: 长时间 CLI 任务要报告真实阶段进度
 description: 用阶段、真实工作单元和持久化进度避免长计算看起来像卡死。
 kind: how-to
 audience: 正在实现批处理、采集或分析型命令行工具的开发者
+lastVerified: "2026-08-31"
 order: 3
 ---
 
@@ -21,16 +22,26 @@ order: 3
 → 保留策略与收尾
 ```
 
-每个阶段报告 `current`、`total` 和人类可读信息：
+每个阶段报告 `current` 和人类可读信息；只有总量能够可靠计算时才提供 `total`：
 
 ```ts
+type ProgressStage =
+  | "load"
+  | "compute"
+  | "summarize"
+  | "persist"
+  | "cleanup"
+  | "complete";
+
 type Progress = {
-  stage: "load" | "compute" | "persist" | "complete";
+  stage: ProgressStage;
   current: number;
-  total: number;
+  total?: number;
   message: string;
 };
 ```
+
+总量未知时应报告已处理数量、当前阶段和持续时间，必要时增加低频心跳；不要为了显示百分比虚构一个 `total`。
 
 ## 使用真实工作单元
 
@@ -45,15 +56,28 @@ type Progress = {
 
 ## 控制输出频率
 
-逐条打印会严重拖慢终端和日志系统。可以把进度映射为固定桶，例如每 5% 输出一次：
+逐条打印会严重拖慢终端和日志系统。总量已知时，可以把进度映射为固定桶，例如每 5% 输出一次：
 
 ```ts
-const bucket = Math.floor((current / total) * 20);
-if (bucket > lastBucket || current === total) {
-  report({ current, total });
-  lastBucket = bucket;
+let lastBucket = -1;
+
+function maybeReport(current: number, total: number) {
+  const safeTotal = Number.isFinite(total) ? Math.max(0, total) : 0;
+  const safeCurrent = Number.isFinite(current)
+    ? Math.min(Math.max(0, current), safeTotal)
+    : 0;
+  const bucket = safeTotal === 0
+    ? 20
+    : Math.floor((safeCurrent / safeTotal) * 20);
+
+  if (bucket > lastBucket) {
+    report({ current: safeCurrent, total: safeTotal });
+    lastBucket = bucket;
+  }
 }
 ```
+
+这个写法会把零工作量阶段完成一次，而不会执行除零；`current` 超出边界时也不会产生大于 100% 的进度。进入新阶段时要重新初始化 `lastBucket`；并发处理多个任务时则应按任务和阶段分别保存桶状态。
 
 对于非交互日志，优先使用普通换行而不是依赖 `\r` 覆盖同一行，确保保存后的日志仍然可读。
 

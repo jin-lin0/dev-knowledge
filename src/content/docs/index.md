@@ -16,7 +16,7 @@ description: 面向长期学习与复用的个人开发知识库。
 ## 当前主题
 
 - [Git](/knowledge/git/)：提交身份、远端认证与协作机制。
-- [Codex](/knowledge/codex/)：规则、Skills 与可复用工作流。
+- [Codex](/knowledge/codex/)：规则、Skills、推理模式与可复用工作流。
 - [前端](/knowledge/frontend/)：组件、浏览器运行时与交互边界。
 - [后端与数据采集](/knowledge/backend/)：数据管道、本地分析与长任务可靠性。
 

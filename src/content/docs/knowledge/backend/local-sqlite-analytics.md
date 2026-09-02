@@ -3,6 +3,7 @@ title: 用 SQLite 构建本地分析型 Web 应用
 description: 让服务端按需查询本地 SQLite，以分页、聚合和读模型安全展示大体量数据。
 kind: explanation
 audience: 正在设计单机数据采集与分析工具的全栈开发者
+lastVerified: "2026-08-31"
 order: 2
 ---
 
@@ -62,11 +63,29 @@ ON trades(run_id, rule_id, horizon, sample, event_date DESC);
 明细查询应限制页大小，图表接口也要限制最大点数：
 
 ```ts
-const pageSize = Math.min(100, Math.max(10, requestedPageSize));
-const pointLimit = Math.min(1000, Math.max(30, requestedPointLimit));
+function clampInt(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+) {
+  if (
+    (typeof value !== 'number' && typeof value !== 'string') ||
+    (typeof value === 'string' && value.trim() === '')
+  ) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(parsed)));
+}
+
+const pageSize = clampInt(requestedPageSize, 10, 100, 25);
+const pointLimit = clampInt(requestedPointLimit, 30, 1000, 300);
 ```
 
-收益分布、净值曲线等视图可以只查询需要的数值列，而不是加载包含大 JSON 的完整记录。数据量继续增长后，可进一步在服务端按时间桶聚合。
+不能只做 `Math.min`/`Math.max`：查询参数缺失、为空、是非数字字符串或 `NaN` 时，都应使用明确的默认值。应先解析并验证有限整数，再执行上下限裁剪。收益分布、净值曲线等视图可以只查询需要的数值列，而不是加载包含大 JSON 的完整记录。数据量继续增长后，可进一步在服务端按时间桶聚合。
 
 ## 跨来源按日统计必须统一日界线
 
@@ -129,13 +148,13 @@ JSON 保存完整性与兼容性
 
 ## SQLite 运行边界
 
-WAL 模式适合“一个采集写入者 + 多个页面读取者”，但本地工具仍应注意：
+[WAL 模式](https://www.sqlite.org/wal.html) 允许读取与写入并发，但同一时刻仍只有一个写入者，因此适合“一个采集写入者 + 多个页面读取者”的单机结构。本地工具还应注意：
 
-- 所有 server 请求结束后及时关闭连接。
+- 短连接应在请求结束后关闭；应用级长连接可以复用，但要及时结束语句和事务，并在服务退出时关闭。
 - 长查询必须有日期范围和行数上限。
 - schema 初始化使用 `CREATE ... IF NOT EXISTS` 保持幂等。
 - 基础小索引可以随 schema 初始化；大索引迁移必须离开请求路径，并避开正在运行的长采集任务。
-- 备份时停止写入并完成 WAL checkpoint，或复制一致的数据库文件集合。
+- 在线备份优先使用 SQLite Backup API 或 `VACUUM INTO`。若手动复制文件，应停止写入、关闭数据库连接并完成最终 checkpoint 后再复制主文件；WAL 中仍有未 checkpoint 的提交时，不能只复制主文件。
 
 ## 为大明细表设置保留窗口
 
@@ -158,7 +177,7 @@ SQLite 删除记录后只会把页加入 freelist，数据库文件通常不会�
   → ANALYZE
 ```
 
-`VACUUM` 需要独占写入，并可能临时需要接近数据库大小的额外磁盘，因此不应在每次运行结束后自动执行。
+`VACUUM` 是写操作；存在阻止写入的连接锁或未结束事务时会失败，并且执行时最多可能需要接近数据库大小两倍的额外可用空间，因此不应在每次运行结束后自动执行。具体边界见 SQLite 的 [VACUUM](https://www.sqlite.org/lang_vacuum.html) 与 [Backup API](https://www.sqlite.org/backup.html) 文档。
 
 ## 何时不适用
 
@@ -169,6 +188,4 @@ SQLite 删除记录后只会把页加入 freelist，数据库文件通常不会�
 - 单次查询需要扫描数十亿行。
 - 需要高并发、权限隔离或持续可用性。
 
-对于单用户、单机、数百万到数千万行的个人研究工具，本地 SQLite 加服务端读模型通常更简单，也能避免部署、凭据和数据同步成本。
-
-这套结构经过类型检查、仓储单元测试、生产构建和本地 HTTP 页面/API 请求验证。
+对于单用户、单机、数百万到数千万行的个人研究工具，本地 SQLite 加服务端读模型通常更简单，也能避免部署、凭据和数据同步成本。是否继续适用仍应通过代表性查询的延迟、数据库体积、WAL 增长和备份耗时来判断，而不能只看行数。

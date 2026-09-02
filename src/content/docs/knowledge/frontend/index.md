@@ -11,3 +11,4 @@ order: 3
 - [Astro 渲染模型与 Vue 交互岛](/knowledge/frontend/astro-vue-components/)
 - [移动端下拉浮层的视口适配](/knowledge/frontend/mobile-dropdown-overlay/)
 - [流式请求的错误提示与安全降级](/knowledge/frontend/streaming-error-fallback/)
+- [前端工程与易忘知识点](/knowledge/frontend/quick-notes/)

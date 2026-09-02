@@ -1,30 +1,36 @@
 ---
 title: 流式请求的错误提示与安全降级
-description: 将 Fetch、HTTP 与流读取错误统一成稳定提示，并安全地建议切换备用资源。
+description: 将 fetch()、HTTP 与流读取错误统一成稳定提示，并安全地建议切换备用资源。
 kind: how-to
 audience: 正在实现流式请求、错误协议和备用资源切换的前端开发者
+lastVerified: "2026-08-31"
 order: 3
 ---
 
-流式请求可能在三个阶段失败：建立连接前的 Fetch 异常、HTTP 非成功响应，以及已经开始读取后的流中断。这三类错误必须统一进入可测试的错误协议，不能把浏览器产生的 `Failed to fetch` 等原始文案直接展示给用户。
+流式请求可能在三个阶段失败：建立连接前的 `fetch()` 异常、HTTP 非成功响应，以及已经开始读取后的流中断。这三类错误必须统一进入可测试的错误协议，不能把浏览器产生的 `Failed to fetch` 等原始文案直接展示给用户。
 
 ## 统一错误码
 
 网络层应该保留用户主动取消，同时把其他连接与读取异常归一化：
 
 ```ts
+const signal = options.signal
+
 try {
   const response = await fetch(url, options)
   if (!response.ok) throw await parseStructuredError(response)
+  if (!response.body) {
+    throw new AppError('响应不包含可读数据流', 'INVALID_STREAM')
+  }
   await consumeStream(response.body)
 } catch (error) {
-  if (error instanceof Error && error.name === 'AbortError') throw error
+  if (signal?.aborted) throw error
   if (error instanceof AppError) throw error
   throw new AppError('服务连接中断', 'NETWORK_ERROR')
 }
 ```
 
-界面层只根据稳定的 `code` 映射可读原因，例如网络中断、限频、额度不足、上游不可用、超时、上下文过长和鉴权失败。后端返回的结构化错误码应原样保留；浏览器或代理的实现细节不应成为用户文案。
+检查 `signal.aborted` 而不只匹配 `AbortError` 名称，可以保留 `abort(reason)` 传入的自定义取消原因。`Response.body` 的类型允许为 `null`，流式端点还应把“成功状态但没有流”归为独立协议错误。界面层只根据稳定的 `code` 映射可读原因，例如网络中断、限频、额度不足、上游不可用、超时、上下文过长和鉴权失败。后端返回的结构化错误码应原样保留；浏览器或代理的实现细节不应成为用户文案。相关底层语义见 [Fetch Standard](https://fetch.spec.whatwg.org/)。
 
 ## 明确失败对象与备用项
 

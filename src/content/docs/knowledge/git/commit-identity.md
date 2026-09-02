@@ -13,7 +13,7 @@ order: 2
 ## 四个环节分别回答什么
 
 ```text
-git config user.name / user.email
+git config user.name / user.email（常用默认值）
               ↓
 写入 commit 的 author 和 committer 元数据
               ↓
@@ -31,14 +31,14 @@ SSH Key 或 HTTPS Token 认证远端平台账号
 | 仓库授权 | 已认证账号是否允许推送 | 仓库角色、团队权限、分支规则 |
 | 平台归属 | 平台把 commit 展示到哪个个人资料 | 提交邮箱、已验证邮箱、平台规则 |
 
-Git 官方的 `git-config` 文档说明，`user.name` 和 `user.email` 决定 commit 对象中的 author 与 committer 字段；它们不是远端登录凭据：[git-config](https://git-scm.com/docs/git-config)。因此，把 `user.email` 改成某个平台账号的邮箱，不会让当前 SSH 连接自动切换到那个账号。
+Git 官方的 `git-config` 文档说明，`user.name` 和 `user.email` 通常为 commit 对象中的 author 与 committer 提供默认值；`author.*`、`committer.*` 配置以及 `GIT_AUTHOR_*`、`GIT_COMMITTER_*` 环境变量可以进一步覆盖它们。无论最终值来自哪一层，这些提交元数据都不是远端登录凭据：[git-config](https://git-scm.com/docs/git-config)。因此，把 `user.email` 改成某个平台账号的邮箱，不会让当前 SSH 连接自动切换到那个账号。
 
 ## 提交身份是 commit 的一部分
 
 创建提交时，Git 会把作者和提交者的姓名、邮箱与时间写进 commit。全局配置提供默认值，仓库本地配置可以覆盖它：
 
 ```bash
-# 查看当前仓库最终生效的值及其来源
+# 查看 Git 配置层读取到的值及其来源
 git config --show-origin --get user.name
 git config --show-origin --get user.email
 

@@ -74,4 +74,4 @@ pnpm check
 pnpm build
 ```
 
-详细规则见[学习知识的收录与编辑规范](/writing-guide/)。
+详细规则见 [学习知识的收录与编辑规范](/writing-guide/)。
