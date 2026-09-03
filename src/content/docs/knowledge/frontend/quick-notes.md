@@ -4,11 +4,20 @@ navTitle: 前端快速复习
 description: 按工程场景整理前端构建、加载与运行时容易混淆的边界。
 kind: note
 audience: 希望快速复习前端工程行为与诊断方法的开发者
-lastVerified: "2026-09-01"
+lastVerified: "2026-09-03"
 order: 4
 ---
 
 这是一份持续增长的前端工程速记页。每个条目只保留能够帮助判断、测量和避免误优化的信息。
+
+## `astro dev` 与 `astro preview` 的内容来源不同
+
+`astro dev` 运行开发服务器，监听 `src/` 并通过 HMR 更新页面；`astro preview` 只提供最近一次 `astro build` 生成的静态目录（默认 `dist/`），修改 Markdown 或源码后不会自动重新构建。
+
+- **排查旧页面**：用 `lsof -nP -iTCP:<port> -sTCP:LISTEN` 找 PID，再用 `ps -p <pid> -o pid=,ppid=,lstart=,etime=,command=` 和 `lsof -a -p <pid> -d cwd` 确认命令、启动时间和工作目录；同时比较 `dist/` 与源文件时间，并直接请求新增路由验证。
+- **记忆点**：本地 URL 能访问只证明端口仍有进程监听，不证明它读取的是最新源码。需要边编辑边看时运行 `astro dev`；需要验证生产构建时先 `astro build`，再运行 `astro preview`。
+- **后台进程**：Astro 7 的 background 模式会把 PID、端口和日志写入 `.astro/dev.json` 或 `.astro/preview.json`；检测到 AI 编码代理时可能自动启用。原终端关闭后进程仍可存活，父 PID 可能变为 1，应结合监听端口和 JSON 中的 PID 判断，不能只看是否还有终端窗口。
+- **来源**：[Astro CLI：dev、build、preview 与 background](https://docs.astro.build/en/reference/cli-reference/)；结论也由本地 Astro 7.2.9 进程命令、锁文件、构建时间和 HTTP 404 响应复核。
 
 ## `defineAsyncComponent` 与路由体积预算
 

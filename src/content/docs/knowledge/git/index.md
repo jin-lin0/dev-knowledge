@@ -10,3 +10,5 @@ order: 1
 
 - [Git 提交身份、远端认证与仓库权限](/knowledge/git/commit-identity/)
 - [Git 命令与易忘知识点](/knowledge/git/quick-notes/)
+- [远程分支领先导致 push 被拒时如何处理](/knowledge/git/remote-divergence-workflow/)
+- [用临时索引创建不改变工作区的 Git 快照](/knowledge/git/temporary-index-snapshot/)
