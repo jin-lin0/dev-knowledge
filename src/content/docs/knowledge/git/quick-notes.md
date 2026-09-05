@@ -8,9 +8,11 @@ lastVerified: "2026-09-03"
 order: 3
 ---
 
-这是一份持续增长的 Git 速记页。每个条目只保留能够帮助回忆、排查和正确使用命令的信息；需要完整机制时，再进入对应专题文章。
+这是一份持续增长的 Git 速记页。内容按本地状态、合并同步、钩子环境和身份配置分组；需要完整机制时，再进入对应专题文章。
 
-## 撤销尚未推送的最新 commit，并保留文件修改
+## 本地历史、快照与跟踪状态
+
+### 撤销尚未推送的最新 commit，并保留文件修改
 
 `git reset` 的模式决定撤销 commit 后，修改留在索引还是工作区：
 
@@ -28,7 +30,7 @@ git reset --mixed HEAD~1
 - **边界**：不要为了保留修改使用 `--hard`，它会同时重置 HEAD、索引和工作区。已经推送到共享分支的提交通常不应直接 reset 改写历史，应根据协作情况考虑 `git revert`。
 - **来源**：[git-reset](https://git-scm.com/docs/git-reset)；结论也由本机 `git reset -h` 的模式说明复核。
 
-## 将未评审 Changes 备份到远端，同时保持本地未暂存
+### 将未评审 Changes 备份到远端，同时保持本地未暂存
 
 远端 Git 只能保存 commit；可以创建一次 WIP commit，将它通过显式 refspec 推到独立备份分支，再把本地 HEAD mixed reset 回去：
 
@@ -48,7 +50,7 @@ git status
 - **保持本地状态完全不变**：自动化场景可以改用 `GIT_INDEX_FILE`、`read-tree`、`write-tree` 和 `commit-tree` 构造快照，详见[用临时索引创建不改变工作区的 Git 快照](/knowledge/git/temporary-index-snapshot/)。
 - **来源**：[git-push 的 refspec](https://git-scm.com/docs/git-push#Documentation/git-push.txt-refspec)、[git-reset](https://git-scm.com/docs/git-reset)。命令模式也由本机 Git 帮助复核。
 
-## `.gitignore` 不会自动取消已经跟踪的文件
+### `.gitignore` 不会自动取消已经跟踪的文件
 
 `.gitignore` 只决定未跟踪文件是否应被 Git 忽略。一个文件只要已经进入索引，即使后来匹配 ignore 规则，修改后仍会出现在 `git status` 中。
 
@@ -67,7 +69,9 @@ git rm --cached -- path/to/generated-file
 - **边界**：有些仓库会默认忽略整个生成目录，但用 `git add -f` 按需跟踪少数生成物。看到“tracked + ignored”不能仅凭目录名判断是错误，应同时检查项目文档、生成/构建流程和同目录历史文件。
 - **来源**：[gitignore](https://git-scm.com/docs/gitignore) 明确说明已跟踪文件不受影响；[git-rm](https://git-scm.com/docs/git-rm) 说明 `--cached` 只从索引移除路径。
 
-## 删除冲突标记不等于 Git 已标记冲突解决
+## 合并状态
+
+### 删除冲突标记不等于 Git 已标记冲突解决
 
 手工编辑冲突文件只会改变工作区；只要索引中仍保留冲突的 stage 1/2/3 条目，`git status --short` 就仍会显示 `UU` 等未合并状态。
 
@@ -85,7 +89,9 @@ git add -- path/to/file
 - **辅助检查**：`git diff --check` 可以发现常见空白错误和残留冲突标记；`git ls-files -u` 能直接确认索引是否仍有未合并条目。
 - **来源**：[Git User Manual：Resolving a merge](https://git-scm.com/docs/user-manual#resolving-a-merge)、[git-status 的 unmerged entries](https://git-scm.com/docs/git-status#_porcelain_format_version_2)、[git-ls-files](https://git-scm.com/docs/git-ls-files)。结论也在 Git 2.39.5 的实际合并状态中复核。
 
-## `pre-commit` 中 ESLint 因 Node 堆内存不足退出
+## 钩子与运行环境
+
+### `pre-commit` 中 ESLint 因 Node 堆内存不足退出
 
 提交输出包含 `Reached heap limit`、`JavaScript heap out of memory` 和 `SIGABRT` 时，直接失败原因是 Node/V8 堆上限，而不是 ESLint 已经报告了某条代码规则错误。大量 staged 文件被 `lint-staged` 一次性交给 ESLint 时尤其容易触发。
 
@@ -104,7 +110,9 @@ NODE_OPTIONS=--max-old-space-size=8192 git commit
 - **清理提示**：`Cleaning up temporary files...` 表示在任务完成或原状态恢复后，删除隐藏的 unstaged patch 并丢弃本轮自动备份 stash。它作用于当前 working tree/index 的临时恢复材料，不会切换、重置或改写其他分支引用；stash 虽然在仓库内跨分支可见，但只有显式 apply/pop 才会作用到工作区。
 - **来源**：[Node.js CLI：`--max-old-space-size` 与 `NODE_OPTIONS`](https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-mib)、[lint-staged：任务参数与失败回滚](https://github.com/lint-staged/lint-staged#readme)。结论也通过 Node 24 的默认堆统计和一次大规模 staged ESLint OOM 日志复核。
 
-## Merge commit 打开提交信息编辑器不代表已经提交
+## 合并与远端同步
+
+### Merge commit 打开提交信息编辑器不代表已经提交
 
 解决冲突后运行 `git commit`，Git 通常会打开预填的 merge commit message。第一行是待提交信息，`# Conflicts:`、状态摘要和所有以 `#` 开头的行都是编辑提示，会被忽略。
 
@@ -114,7 +122,7 @@ NODE_OPTIONS=--max-old-space-size=8192 git commit
 - **记忆点**：`It looks like you may be committing a merge` 是根据 `MERGE_HEAD` 给出的说明，不是错误。确认本来就在合并时，不要删除 `MERGE_HEAD`。
 - **来源**：[git-commit](https://git-scm.com/docs/git-commit)、[githooks](https://git-scm.com/docs/githooks)。
 
-## Merge commit 之后执行 `git pull` 突然出现大量文件
+### Merge commit 之后执行 `git pull` 突然出现大量文件
 
 先检查 `git status` 和 `git config --show-origin --get pull.rebase`。当 `pull.rebase=true` 时，`git pull` 会先 fetch，再把本地提交重新播放到最新 upstream；普通 rebase 默认不会保留本地 merge commit 的拓扑，可能把合并进来的整组提交重新应用一次。
 
@@ -130,7 +138,9 @@ git diff --name-only --diff-filter=U
 - **完整流程**：[远程分支领先导致 push 被拒时如何处理](/knowledge/git/remote-divergence-workflow/)。
 - **来源**：[git-pull](https://git-scm.com/docs/git-pull) 说明 `--rebase` 与 `--no-rebase` 的集成方式；[git-rebase](https://git-scm.com/docs/git-rebase) 说明 detached replay、冲突继续和 `--abort` 恢复原分支。
 
-## 查看某项配置的实际来源
+## 配置、身份与认证
+
+### 查看某项配置的实际来源
 
 ```bash
 git config --show-origin --get user.email
@@ -141,7 +151,7 @@ git config --show-origin --get user.email
 - **延伸阅读**：[Git 提交身份、远端认证与仓库权限](/knowledge/git/commit-identity/)。
 - **来源**：[git-config](https://git-scm.com/docs/git-config)。
 
-## 同时查看 author 与 committer
+### 同时查看 author 与 committer
 
 ```bash
 git log -1 --format=fuller
@@ -151,7 +161,7 @@ git log -1 --format=fuller
 - **记忆点**：`fuller` 格式会分别显示 `Author`、`AuthorDate`、`Commit` 和 `CommitDate`，适合排查代提交、变基或身份配置问题。
 - **来源**：[git-log 的 pretty formats](https://git-scm.com/docs/git-log#_pretty_formats)。
 
-## 确认 GitHub SSH 密钥对应哪个账号
+### 确认 GitHub SSH 密钥对应哪个账号
 
 ```bash
 ssh -T git@github.com
@@ -161,7 +171,9 @@ ssh -T git@github.com
 - **记忆点**：认证成功的消息会包含用户名，但 GitHub 不提供 shell，因此该命令成功认证后仍会以状态码 `1` 退出；应判断消息内容，不能只判断退出码。
 - **来源**：[GitHub：Testing your SSH connection](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/testing-your-ssh-connection)。
 
-## GitHub 仓库改名后，旧 remote 为什么还能使用
+## 远端地址
+
+### GitHub 仓库改名后，旧 remote 为什么还能使用
 
 GitHub 会把指向仓库旧位置的 `git clone`、`git fetch` 和 `git push` 请求重定向到新位置；本地仓库的 `.git/config` 不会因此自动改写，所以 `git remote -v` 仍可能显示旧 URL。
 
