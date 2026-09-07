@@ -71,6 +71,23 @@ pnpm --filter <package-name> run dev:server
 - **恢复边界**：如果工作区原本已有用户改动，不要直接用覆盖式 Git 命令回退；先精确区分本次工具产生的差异，再取得用户授权或逐项恢复。
 - **验证依据**：npm/pnpm 脚本会原样执行 `package.json` 中配置的命令；`eslint --fix` 的语义就是把可自动修复的问题写回文件。实际运行也应以脚本内容和前后 Git 差异为准。
 
+## 自动化测试
+
+### Playwright：DOM 存在不等于元素可见
+
+`locator.waitFor()` 默认等待 `visible`，要求元素具有非空边界框且不是 `visibility: hidden`。元素即使已经存在、也已经加上“收起”类，只要尺寸变成零，等待可见仍会超时。
+
+- **只确认节点和状态类存在**：使用 `state: 'attached'`；例如等待折叠后的面板。
+- **确认用户看得到内容**：使用 `visible`；确认移除节点则使用 `detached`。
+- **注意 `hidden`**：它同时接受节点不存在和节点不可见，不能单独证明某个业务操作已经完成。
+- **诊断方法**：区分“找不到元素”与“找到了但不可见”；检查 class/属性、边界框及明确的业务完成状态，不要仅增加超时或重复执行已经完成的操作。
+
+```js
+await page.locator('#settings-panel.is-collapsed').waitFor({ state: 'attached' });
+```
+
+来源：[Playwright Locator.waitFor](https://playwright.dev/docs/api/class-locator#locator-wait-for) 定义四种等待状态；本地浏览器验证也确认零高度折叠容器会被默认可见性等待判为未就绪。核验日期：2026-09-07。
+
 ## 进程与环境
 
 ### Node.js `spawn()` 子进程只能看到传入的环境

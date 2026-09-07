@@ -4,11 +4,20 @@ navTitle: Codex 快速复习
 description: 快速区分 Codex 的执行模式、模型推理强度和其他容易混淆的概念。
 kind: note
 audience: 希望快速选择 Codex 工作方式与模型设置的开发者
-lastVerified: "2026-09-01"
+lastVerified: "2026-09-06"
 order: 3
 ---
 
 这是一份持续增长的 Codex 速记页。每个条目只保留选择设置和排查概念混淆时需要的信息。
+
+## ChatGPT 网页与 Codex 的模型可用性
+
+同一个 ChatGPT 账号在网页端看到某个模型，不代表该模型会同时出现在 Codex 桌面应用、CLI、IDE 扩展或 Codex Cloud 中。各产品界面分别依据推出阶段、客户端支持、登录方式、账号权益和工作区策略计算可用模型。
+
+- **排查顺序**：先确认网页端与 Codex 登录的是同一账号和工作区，再更新并重启客户端、重新打开模型选择器；团队账号还应检查管理员是否为 Codex 单独启用了该模型。
+- **记忆点**：模型选择器没有列出时，通常不能靠手写 `config.toml` 的模型 ID 绕过权限；配置只能选择当前产品和身份已经获准使用的模型。
+- **特别情况**：Codex Cloud 当前不能修改云端聊天的默认模型。使用 API Key 登录时，模型权限取决于该 Key 所属的 API 组织和项目，不继承 ChatGPT 网页端权限。
+- **来源**：[OpenAI Codex 模型](https://learn.chatgpt.com/zh-Hans/docs/models)、[OpenAI 工作区模型可用性](https://learn.chatgpt.com/zh-Hans/docs/enterprise/workspace-model-availability)。
 
 ## `xhigh（极高）`、`Max（最高）` 与 `Ultra`
 

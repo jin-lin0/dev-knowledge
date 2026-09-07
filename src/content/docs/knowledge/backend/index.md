@@ -6,6 +6,10 @@ order: 5
 
 这里记录外部 API 集成、批量数据管道和长时间任务中可复用的可靠性设计。
 
+## 数据库与数据生命周期
+
+- [后端与数据库易忘知识点](/knowledge/backend/quick-notes/)：软删除、回收站、外部文件与 CDN 清理的边界。
+
 ## 数据采集与覆盖范围
 
 - [批量采集器要区分空数据与真正失败](/knowledge/backend/no-data-vs-failure/)
