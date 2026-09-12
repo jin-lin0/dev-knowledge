@@ -12,6 +12,7 @@ order: 4
 
 ## 完成交互与网络任务
 
+- [单线程 JavaScript 如何实现异步并发](/knowledge/frontend/async-concurrency/)
 - [移动端下拉浮层的视口适配](/knowledge/frontend/mobile-dropdown-overlay/)
 - [流式请求的错误提示与安全降级](/knowledge/frontend/streaming-error-fallback/)
 

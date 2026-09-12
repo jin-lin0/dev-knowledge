@@ -6,6 +6,14 @@ order: 5
 
 这里记录外部 API 集成、批量数据管道和长时间任务中可复用的可靠性设计。
 
+## HTTP 接口与故障定位
+
+- [HTTP 路由与异常速记](/knowledge/backend/quick-notes/#http-路由与异常)：NestJS 路由兜底 404、异常通知与请求来源的判断边界。
+
+## 模型 API 与凭据接入
+
+- [用户自带 API Key 的模型接入边界](/knowledge/backend/byok-model-integration/)：额度归属、协议兼容、密钥托管与自定义 URL 的 SSRF 风险。
+
 ## 数据库与数据生命周期
 
 - [后端与数据库易忘知识点](/knowledge/backend/quick-notes/)：软删除、回收站、外部文件与 CDN 清理的边界。
@@ -21,6 +29,6 @@ order: 5
 ## 长任务与质量验证
 
 - [长时间 CLI 任务要报告真实阶段进度](/knowledge/backend/long-running-cli-progress/)
-- [让 Agent 评测结果值得相信](/knowledge/backend/trustworthy-agent-evaluation/)
+- [让 Agent 评测结果值得相信](/knowledge/backend/trustworthy-agent-evaluation/)：执行证据、评分口径、LangSmith 平台复用与自研适配边界。
 
 本地端口、pnpm、Node.js 子进程和 macOS 后台任务已经归入 [工程工具与系统](/knowledge/tooling/)。

@@ -4,7 +4,7 @@ navTitle: 本地开发与构建速记
 description: 按网络、workspace、进程环境与退出状态整理本地工程的常见易错点。
 kind: note
 audience: 开发或调试本地服务、Node.js 进程和构建脚本的开发者
-lastVerified: "2026-09-06"
+lastVerified: "2026-09-09"
 order: 2
 ---
 
@@ -73,6 +73,16 @@ pnpm --filter <package-name> run dev:server
 
 ## 自动化测试
 
+### Jest 的测试入口由发现规则决定
+
+测试目录可以同时放测试入口、共享测试数据构造器和辅助脚本；文件是否作为独立测试套件运行，要看 Jest 的发现配置。
+
+- **默认约定**：Jest 的默认匹配包含 `__tests__` 目录中的测试源文件，以及其他位置的 `.test` / `.spec` 文件，不能单凭“没有 spec 后缀”断言不会被收集。
+- **显式规则**：配置 `testRegex: '.*\\.spec\\.ts$'` 后，测试入口限定为 `.spec.ts` 结尾；普通 `fixtures.ts` 或 `helpers.ts` 可以被测试导入，但不会因此成为独立测试套件。`testMatch` 与 `testRegex` 不能同时配置。
+- **辅助脚本**：子进程测试还可能需要独立运行的 `.cjs` 文件，它模拟进程行为，由测试启动，不需要包含 `describe` 或 `it`。
+- **验证**：用 `jest --listTests --runInBand` 查看实际收集结果，区分“没有被当成测试入口”与“被其他测试调用时会执行”。
+- **来源**：[Jest 测试发现配置](https://jestjs.io/docs/30.0/configuration#testmatch-arraystring)、[testRegex](https://jestjs.io/docs/30.0/configuration#testregex-string--arraystring)；2026-09-10 通过本地测试发现命令验证显式后缀规则与辅助文件未被单独收集。
+
 ### Playwright：DOM 存在不等于元素可见
 
 `locator.waitFor()` 默认等待 `visible`，要求元素具有非空边界框且不是 `visibility: hidden`。元素即使已经存在、也已经加上“收起”类，只要尺寸变成零，等待可见仍会超时。
@@ -89,6 +99,47 @@ await page.locator('#settings-panel.is-collapsed').waitFor({ state: 'attached' }
 来源：[Playwright Locator.waitFor](https://playwright.dev/docs/api/class-locator#locator-wait-for) 定义四种等待状态；本地浏览器验证也确认零高度折叠容器会被默认可见性等待判为未就绪。核验日期：2026-09-07。
 
 ## 进程与环境
+
+### Node.js `os.userInfo().username`：当前进程的系统用户名
+
+`os` 是 Node.js 内置的操作系统模块。`os.userInfo()` 同步返回当前有效操作系统用户的信息对象，`.username` 是读取该对象的用户名属性，默认得到字符串。
+
+```js
+import os from 'node:os';
+
+const username = os.userInfo().username;
+```
+
+- **返回内容**：对象还包含 `uid`、`gid`、`homedir` 和 `shell`；Windows 下 `uid`、`gid` 为 `-1`，`shell` 为 `null`。
+- **身份边界**：结果对应运行进程的系统账号。以服务账号或容器内账号运行时，得到的是该运行账号，不能据此确定网页操作者或已登录的业务用户。
+- **调用边界**：不需要 `await`；默认编码为 UTF-8。操作系统缺少用户名或主目录信息时可能抛出 `SystemError`，调用方应按需要处理。
+- **来源与验证**：[Node.js `os.userInfo()`](https://nodejs.org/api/os.html#osuserinfooptions)；2026-09-10 在 Node.js v24.19.0 上核验返回值非 Promise、用户名为字符串、`uid` 与 `process.geteuid()` 一致，未记录真实用户名或用户目录。
+
+### IPC：进程间通信
+
+IPC 是 Inter-Process Communication 的缩写，表示进程之间交换消息和数据。Node.js 的 `child_process.fork()` 内置父子进程消息通道：父进程用 `child.send(message)`，子进程用 `process.send(message)`，双方通过 `message` 事件接收。
+
+- **记忆点**：IPC 负责通信，不负责创建线程或保证任务并发。普通对象消息经过序列化和解析，接收方不会直接拿到发送方原来的对象引用。
+- **用途**：主进程发送开始、取消等命令，子进程回报进度、结果或错误。
+- **来源**：[Node.js subprocess.send](https://nodejs.org/api/child_process.html#subprocesssendmessage-sendhandle-options-callback)。
+
+### `fork()`、`worker_threads` 与异步并发池
+
+任务被命名为 worker，不代表它创建了线程或进程；应查看真正的启动 API。
+
+- **`child_process.fork()`**：启动新的 Node.js 子进程，各自拥有 V8 实例与内存，并内置 IPC 消息通道。模块单例与普通 JS 对象不会直接与父进程共用；文件、数据库等外部资源仍可能共享。
+- **`worker_threads.Worker`**：在同一进程中并行执行 JavaScript 的线程，适合 CPU 密集计算；可通过 `SharedArrayBuffer` 显式共享内存。
+- **`async` 循环和 `Promise.all()`**：不创建新的 JS 线程或进程；完整机制见[单线程异步并发](/knowledge/frontend/async-concurrency/)，独立任务状态仍需程序显式管理。
+- **来源**：[Node.js 子进程与 fork](https://nodejs.org/api/child_process.html#child_processforkmodulepath-args-options)、[Worker threads](https://nodejs.org/api/worker_threads.html)；2026-09-09 对照调用入口、异步循环和共享对象生命周期核验。
+
+### macOS 应用打不开：`-600` / `procNotFound`
+
+macOS 的 `OSStatus -600` 对应 `procNotFound`，SDK 定义为“没有符合指定描述符的可用进程”。它描述一次进程定位或通信失败，不能仅凭错误码认定应用文件损坏、内存不足或硬件故障。
+
+- **先确认对象**：保留完整错误域、错误码和 `AppPath`。桌面弹窗中的应用名称可能不够明确，系统日志中的路径有助于确认实际启动失败的应用。
+- **关联日志**：应用启动失败可查 `CoreServicesUIAgent`、`launchservicesd`；打开或保存对话框异常可查 `com.apple.appkit.xpc.openAndSavePanelService`，对照同一时间段的退出、故障和连接错误。
+- **判断边界**：多个应用同时异常、重启后恢复，是检查共享系统服务的线索，不足以证明它们有同一个根因；服务退出日志证明退出事实，也未必给出最初触发原因。
+- **证据来源**：Apple macOS SDK 的 `CarbonCore.framework/Headers/MacErrors.h` 明确声明 `procNotFound = -600`；[Apple 的 `procNotFound` 条目](https://developer.apple.com/documentation/coreservices/procnotfound)提供符号入口。系统统一日志也可直接出现 `NSOSStatusErrorDomain Code=-600` 与该描述。核验日期：2026-09-08。
 
 ### Node.js `spawn()` 子进程只能看到传入的环境
 

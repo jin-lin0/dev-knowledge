@@ -8,8 +8,10 @@ order: 6
 
 ## 按问题查找
 
+- **IPC、子进程、线程与异步并发的区别**：查看速记中的 [IPC 与进程执行方式](/knowledge/tooling/quick-notes/#ipc进程间通信)。
 - **端口不通、脚本跑错目录、子进程缺环境变量、构建假成功**：[本地开发、进程与构建速记](/knowledge/tooling/quick-notes/)。
 - **UI 自动化等待超时、元素存在但不可见**：查看速记中的 [自动化测试](/knowledge/tooling/quick-notes/#自动化测试)。
+- **macOS 应用打不开、`-600` 错误、打开或保存对话框异常**：查看速记中的 [进程与环境](/knowledge/tooling/quick-notes/#进程与环境)。
 - **定时任务、登录后后台服务、休眠补跑与计划唤醒**：[macOS `launchd` 与计划任务](/knowledge/tooling/macos-launchd/)。
 
 ## 与其他主题的边界

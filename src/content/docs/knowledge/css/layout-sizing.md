@@ -62,6 +62,22 @@ Flex 子项在主轴上的 `min-width: auto` 通常会使用基于内容的自�
 
 来源：[CSS Sizing Level 3 的固有尺寸定义与取值](https://www.w3.org/TR/css-sizing-3/#sizing-values)。
 
+## 响应式适配不能丢掉组件原有的宽度上限
+
+组件可能用 `width: 100%` 配合 `max-width: 420px` 控制尺寸。直接覆盖成 `max-width: calc(100vw - 32px)` 会丢掉原来的 420px 上限，在较宽窗口中反而把小弹窗撑成横条。两个约束要一起保留：
+
+```css
+.confirm-box {
+  width: 100%;
+  max-width: min(420px, calc(100vw - 32px));
+}
+```
+
+- 组件库提供尺寸变量时，优先在 `min()` 中引用原来的设计变量，避免另写一份上限。例如 Element Plus 的 MessageBox 使用 `--el-messagebox-width`。
+- 间距覆盖也要限制作用域：自有按钮组已经用 `gap` 时，可以只清掉该组直接子按钮的额外 margin；全局清零组件库相邻按钮的 margin，会让弹窗等依赖默认间距的按钮粘连。
+- 默认态正确也要检查 `hover`、`active` 和焦点态。Element Plus 2.8.4 的文字按钮在悬停/按下时分别读取 `--el-fill-color-light`、`--el-fill-color`；为具体按钮设置这些局部变量，可以让库的状态规则直接使用目标颜色，避免普通自定义 hover 规则被更高优先级的库规则覆盖。此行为已用发布包 CSS 和真实鼠标悬停的计算样式验证。
+- 验证时同时查看组件的原始样式、最终计算值和实际页面。来源：Element Plus 2.8.4 发布包的 MessageBox CSS（`width: 100%`、默认宽度变量 420px）与本地浏览器修复前后对照；核验于 2026-09-09。
+
 ## 改 Grid 列定义不会隐藏元素
 
 ```css
