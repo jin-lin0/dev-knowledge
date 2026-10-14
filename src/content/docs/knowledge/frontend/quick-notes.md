@@ -28,7 +28,40 @@ order: 4
 
 - **用法**：文本编辑器可保存 `savedText`，用 `computed(() => text.value !== savedText.value)` 派生 `dirty`；保存或重新加载成功后更新基线。
 - **边界**：撤销或重新输入原文后应回到未修改；如果产品忽略格式、空白或字段顺序，需要另外定义语义比较规则。文本相等只适用于以原文为保存单位的编辑器。
+- **导入边界**：导入文件只是替换编辑缓冲区，没有完成持久化，不能同时更新保存基线；否则 `dirty` 会变成 false，关闭时可能丢弃尚未保存的导入内容。只有成功保存或明确重新加载持久化内容时才移动基线。
 - **来源**：2026-09-09 本地 Vue 3.5.8 响应式实验验证原文、修改、恢复原文三个阶段分别为 `false → true → false`；浏览器同时检查关闭确认的取消操作保留编辑缓冲区。
+- **追加验证**：2026-10-13 用本地浏览器验证导入后更新基线会绕过未保存关闭保护，并以独立 Node.js 示例确认导入内容应继续与原保存内容比较。
+
+### 对象展开不能隔离表单的嵌套草稿
+
+`{ ...template }` 只复制第一层属性，嵌套对象和数组仍与模板共享引用。在表单中修改数组成员，即使最后选择放弃，也可能已经改动默认模板，影响下一次新建。
+
+```js
+const template = { rules: [{ required: true }] };
+const draft = { ...template };
+draft.rules[0].required = false;
+console.log(template.rules[0].required); // false
+```
+
+- **用法**：对于普通、可结构化克隆的数据，打开编辑器时用 `structuredClone(template)` 建立独立草稿；只有保存成功才把结果交回持久化层或父状态。不要把函数、DOM 或 Vue Proxy 直接当成可克隆的数据，应先明确普通数据边界。
+- **验证**：2026-10-13 独立 Node.js 断言确认展开对象共享嵌套引用，而对同一普通数据使用 `structuredClone` 后，修改草稿不会改变模板；另用本地浏览器复核“修改、放弃、再次新建”的完整交互。
+
+### Vue computed 不会因时间经过自动重算
+
+计算属性缓存依赖响应式数据；读取 `Date.now()` 或 `new Date()`，不会把系统时间变成响应式依赖。对已经缓存的结果，单纯推进时钟不会保证它重新计算。
+
+```ts
+const now = ref(Date.now());
+const deadline = ref(Date.now() + 60_000);
+const expired = computed(() => now.value >= deadline.value);
+
+// 由现有调度器或明确的刷新事件更新真正的响应式依赖。
+now.value = Date.now();
+```
+
+- **适合场景**：倒计时、过期提示、按当前时间筛选记录，以及依赖时间边界的展示状态。
+- **边界**：改成普通函数也不会让界面随时间自动刷新，仍需要触发调用或渲染。时间变化只说明判断边界变化，不代表缓存中的外部数据已经更新；数据也有时效要求时，应同时明确重取与失效规则。
+- **来源**：[Vue 计算属性缓存与方法](https://vuejs.org/guide/essentials/computed#computed-caching-vs-methods)。2026-10-11 用假时钟核验：依赖数组不变时，跨过截止时间后计算属性仍返回缓存筛选结果。
 
 ### 上下文菜单的目标应绑定触发行
 
@@ -51,7 +84,27 @@ order: 4
 
 - **来源**：[HTML Standard：数字字符引用](https://html.spec.whatwg.org/multipage/syntax.html#syntax-charref)与 [raw text 解析状态](https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inrawtext)。
 
+## 组件语义与可访问性
+
+### Vue 的属性透传不保证标注到内部交互控件
+
+单根组件会把未声明的属性自动加到根元素。如果根元素只是布局容器，实际的 `input`、`button` 或 `role="combobox"` 在内部，把 `aria-label` 写在组件调用处可能只给外层容器命名，内部控件仍然没有正确的可访问名称。
+
+- **实现选择**：用明确的 `ariaLabel` / `ariaLabelledby` prop 绑定到实际控件；或关闭自动继承后，有选择地把 `$attrs` 转发到控件。布局用的 `class`、`style` 与控件属性要分别确定目标，避免整包移动后改变布局。
+- **标签与值**：选择器名称应表达“选择什么”，例如“周期”；当前值是“周线”。有可见标签时可使用 `aria-labelledby` 建立关联；`aria-label` 也应与可见标签保持一致。
+- **验证**：检查浏览器可访问性树中控件的名称，用角色和名称定位控件，并验证方向键选择、Enter 确认、Escape 关闭和焦点恢复；只看到外层 DOM 上有属性不足以证明控件已标注。
+- **来源**：[Vue 属性透传](https://vuejs.org/guide/components/attrs.html)、[WAI-ARIA Combobox 模式](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/)。2026-10-11 通过组件测试与 Chrome 的 DOM / 可访问性观察核验内部控件命名和键盘交互。
+
 ## 构建与加载
+
+### Vue SFC 的编译与类型检查是两条链路
+
+Vite 转换 TypeScript 和 Vue 单文件组件，并不等于执行类型检查；SFC 的脚本、模板、props 和事件类型应通过 `vue-tsc` 校验，并明确接入开发或 CI 流程。
+
+- **关键命令**：已有正确配置时运行 `pnpm exec vue-tsc --noEmit`。能手工运行，不等于项目构建或 CI 已经自动调用。
+- **通配声明边界**：`declare module '*.vue'` 中的宽泛 `DefineComponent` 声明，不能单独证明 `vue-tsc` 会丢失 SFC 的 props/emits 类型；它能够从实际 SFC 生成类型信息。应以具体调用的诊断结果确认边界，不机械地为每个组件手写另一份声明。
+- **验证**：2026-10-13 用两个通用 Vue 组件及同样的通配声明核验：子组件声明数字 prop 和数字事件参数，父组件传字符串 prop、使用接收字符串的事件处理器，`vue-tsc` 分别报告两处 TS2322。
+- **来源**：[Vue 官方 TypeScript 概览](https://vuejs.org/guide/typescript/overview.html)说明 Vite 转换与类型检查的职责，以及 `vue-tsc` 对 SFC 的支持。
 
 ### `astro dev` 与 `astro preview` 的内容来源不同
 
@@ -71,9 +124,119 @@ order: 4
 - **验证方法**：预算配置显式标记“首帧必触发”的动态入口并纳入依赖闭包，再用冷缓存浏览器网络记录核对实际请求。是否属于首次成本取决于组件何时渲染，而不是只看它是否使用 `import()`。
 - **来源**：[Vue 异步组件](https://vuejs.org/guide/components/async)、[Vite manifest 结构](https://vite.dev/guide/backend-integration.html)。
 
+## TypeScript 类型与运行时校验
+
+### `as unknown as T` 是双重类型断言，不是数据转换
+
+`value as unknown as T` 先把表达式视为 `unknown`，再要求编译器把它视为 `T`。当原类型与目标类型缺少足够的兼容关系、直接断言被拒绝时，这种写法可以绕过检查，但不会验证字段、补齐属性或转换实际值。
+
+```ts
+const value = '42' as unknown as number;
+console.log(typeof value); // 运行时仍然是 string
+```
+
+- **删除边界**：只删中间的 `as unknown`，可能重新触发类型不兼容错误；全部删除，则恢复原表达式的静态类型。应先确认声明与真实数据为什么不同。
+- **替代方式**：对于 IPC、接口或测试替身的独立数据协议，可以用运行时 Schema 校验并推导类型。测试如果需要核对请求是否原样传递，应保留原始字段做完整比较，避免通过补默认值或转换掩盖传输问题。
+- **来源**：[TypeScript 官方类型断言说明](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#type-assertions)，2026-10-13 核验；类型断言在编译时移除，不包含运行时检查。
+
+## JavaScript 表达式
+
+### 比较运算符先于相等运算符分组
+
+`<`、`>`、`<=`、`>=` 的优先级高于 `===`、`!==`。例如 `flag !== count > 0` 解析为 `flag !== (count > 0)`，先比较数值，再比较两个布尔值；不是 `(flag !== count) > 0`。
+
+- **可读性**：显式写成 `flag !== (count > 0)` 能表达分组意图，但在这个表达式中加括号不改变行为。优先级决定语法分组，不等于所有操作数都按优先级顺序求值。
+- **验证**：2026-10-14 用 TypeScript 解析器确认外层节点为 `!==`、右侧节点为 `>`；在 Node.js v26.0.0 中遍历布尔 flag 与 count 为 0、1、2 的六种组合，确认原式与显式括号形式结果一致。
+
+## JavaScript 数据与序列化
+
+### 序列化时的条件判断：空数组也是真值
+
+序列化是把数据转换成适合保存或传输的表示，JavaScript 中常见的是用 `JSON.stringify` 生成 JSON 文本。应用也可能先把运行时模型转换成普通对象，再生成 JSON；在构造对象时写的条件决定哪些字段会被输出，并不等于执行数据校验。
+
+```js
+const items = [];
+const output = {
+  ...(items ? { items } : {}),
+};
+JSON.stringify(output); // '{"items":[]}'
+```
+
+- **条件展开**：三元表达式选择一个对象，`...` 再把该对象的字段加入结果；选中 `{}` 就不添加字段。
+- **空不等于假**：`Boolean([])` 为 `true`，空数组会进入真分支；`undefined` 为 `false`，上述条件在字段未定义时选择空对象。
+- **判断意图**：`if (items)` 检查真值，不检查数组是否有成员。若协议只输出非空数组，需要明确判断数组类型和 `length > 0`；若空数组本身表示有意义的空结果，就应保留。
+- **验证**：2026-10-09 用独立 Node.js 示例检查 `undefined`、空数组、非空数组三种输入，条件展开后分别得到字段省略、字段值为 `[]`、字段值为非空数组。
+
+## JavaScript 调用与作用域
+
+### 把函数作为参数：回调的实参由接收方提供
+
+`run(callback)` 传入的是函数本身；`run` 的实现决定何时调用它、传入哪些实参，以及是否返回它的结果。函数有两个形参，不代表外层 `run` 也接收两个参数。
+
+```js
+async function withResource(execute) {
+    const resource = { value: 'ready' };
+    const readState = () => resource.value;
+    return execute(resource, readState);
+}
+
+const suffix = '!';
+const result = await withResource((resource, readState) => {
+    return Promise.resolve(readState() + suffix);
+});
+// result === 'ready!'
+```
+
+- **参数来源**：`resource` 和 `readState` 由 `withResource` 调用回调时提供；`suffix` 来自回调定义处的外层作用域，这就是闭包。
+- **返回链**：回调返回 Promise，外层 async 函数返回它，调用方 `await` 得到最终值。箭头函数的表达式体会隐式返回表达式；改成花括号函数体时，需要明确写 `return` 才会传出该结果。
+- **执行时机**：定义或传递函数不等于执行函数体；这里真正触发执行的是 `execute(resource, readState)`。回调也不天然意味着异步或另开线程。
+- **验证**：2026-10-13 独立 Node.js 断言确认定义回调时无执行记录，包装器调用后按准备、回调顺序执行，最终 `await` 收到 `ready!`。
+
+### 对象方法与外层函数同名，不代表裸调用就是递归
+
+对象方法简写中的方法名是属性名；方法体里的裸标识符按词法作用域查找，不会因为属性同名就自动指向该方法。
+
+```js
+function load(value) {
+    return `outer:${value}`;
+}
+
+const worker = {
+    load(value) {
+        return load(value);
+    },
+};
+
+worker.load('demo'); // 'outer:demo'
+```
+
+这里调用的是外层函数。`this.load(value)` 则通过接收者读取方法；同名复用容易让读者误判，包装方法可以保留公开名称，并给内部函数使用更明确的名字。上述方法简写与外层函数的解析关系已通过本地 Node.js 聚焦运行验证。
+
 ## 异步任务与错误处理
 
 单线程、事件循环、`await` 与并发上限的完整机制见[单线程 JavaScript 如何实现异步并发](/knowledge/frontend/async-concurrency/)。下列速记聚焦返回值和错误传播。
+
+### 自定义 Error 类负责携带错误语义
+
+自定义错误类可以很简单：它统一构造稳定的 `code`、错误名称和必要的上下文字段，让捕获方判断发生了什么。重试、终止或界面提示等处理策略由调用方决定，不需要都写进错误类。
+
+```js
+class LookupError extends Error {
+  code = 'LOOKUP_MISSING';
+
+  constructor(key) {
+    super(`Missing key: ${key}`);
+    this.name = 'LookupError';
+    this.key = key;
+  }
+}
+```
+
+- **识别依据**：`code` 是应用自行约定的字段，普通 `new Error()` 不会自动带业务错误码。使用稳定的 code 和上下文字段比解析可能改写的 message 更可靠；同一种“对象不存在”还可能需要结合已有记录才能判断原因。
+- **继承的价值**：仍可正常 `throw/catch`，使用 Error 的 message、运行时提供的 stack，以及同一 JavaScript realm 内的 `instanceof` 判断。类主要保证构造方式和字段约定，普通 Error 加字段或工厂函数也能实现同类协议。
+- **封装边界**：错误定义可以是内部实现，独立文件只是组织选择。其他内部文件要导入定义时需要模块导出，但不代表必须额外公开 `package.json` 的包子路径；是否提供公开入口应由包外调用需求决定。调用方只消费 code 与普通字段时，无需依赖具体错误类。
+- **传输边界**：显式发送 `{ code, message, key }` 等普通数据；JSON 序列化不会保留自定义类原型，接收方不能假设对象仍能通过 `instanceof LookupError`。
+- **来源**：2026-10-09 在 Node.js `v24.19.0` 独立验证继承、错误码/元数据、stack，以及 JSON 往返后原型身份丢失而 code 保留；另以临时 ESM 包验证内部模块导出可供包主入口使用，未列入 exports 的子路径则报 `ERR_PACKAGE_PATH_NOT_EXPORTED`。
 
 ### 加载状态与加载提示的显示时机应分开
 
@@ -91,7 +254,29 @@ order: 4
 
 - **提交边界**：发送前复制本次选择和参数，之后的进度占位读取提交快照，不能重新读取仍可编辑的表单。
 - **回写边界**：发请求时记录任务 ID；响应回来后核对当前任务仍是同一个，再拒绝把终态回退为进行中。取消按钮还需有请求中的标记，防止连续点击发起重复取消。
+- **资源详情边界**：选中资源与它的标题、正文和加载状态需要保持同一身份。切换资源后，旧请求的成功、错误和 `finally` 都不能改写新资源；新资源失败时显示它的失败状态，不能把旧正文挂在新 ID 下。取消传输与回写时校验请求版本可以同时使用，即使传输忽略取消，版本检查仍能阻止旧数据覆盖。
+- **补充验证**：2026-10-10 用可手动完成的 Promise 验证先选 A、后选 B 而 A 后完成，旧请求完成时 B 仍在加载，以及 B 失败时清除旧详情三个场景；这些测试控制完成顺序，不依赖真实网络延迟。
 - **验证方法**：用可手动完成的 Promise 控制响应顺序，覆盖“轮询先确认完成、取消响应后到”“取消先完成、旧轮询后到”，以及提交等待期间修改表单。2026-09-09 的本地状态测试验证了这些顺序。
+
+### `async function*` 返回迭代器，消费时才执行函数体
+
+调用异步生成器函数只得到异步迭代器；函数体从第一次 `.next()` 开始执行。`for await...of` 会不断请求下一项，因此通常也是事件流开始实际工作的地方。
+
+```js
+async function* produce(input) {
+    console.log('started', input);
+    yield 'first';
+    yield 'last';
+}
+
+const events = produce('demo'); // 此时还没有打印 started
+for await (const event of events) {
+    console.log(event);
+}
+```
+
+- **边界**：这条惰性执行规则针对 `async function*`，不能推广到所有叫 `stream` 的函数，也不能套用于普通 async 函数；普通 async 函数调用后会立即执行到第一个等待点。
+- **验证**：2026-10-13 独立 Node.js 断言确认创建迭代器后函数体执行记录仍为空，消费后才出现 started，按序收到 first 和 last。
 
 ### `await` 只能等待函数实际返回的任务
 
@@ -130,6 +315,23 @@ for (let offset = 0; offset < ids.length; offset += batchSize) {
 - **记忆点**：5 个条目按每批 2 个拆成 `2 + 2 + 1`，批次串行执行。`push(...batchResult)` 把本批数组中的元素逐个追加，得到一个合并数组；`push(batchResult)` 则会追加数组本身。
 - **边界**：空输入不会发起请求；若某批 Promise 拒绝且没有捕获，函数会停止后续批次并以拒绝结束，不会成功返回已经累积的部分结果。
 - **来源**：2026-09-09 在 Node.js `v26.0.0` 用异步模拟请求验证：批次大小为 `[2, 2, 1]`、最多同时执行 1 批、结果合并且原输入不变；空输入调用次数为 0，第二批拒绝后未发起第三批。
+
+### 共享在途 Promise 需要失败后释放
+
+请求去重可以按资源身份保存正在执行的 Promise，让重叠调用复用同一个任务；成功和失败都必须释放在途记录，否则一次失败可能让后续重试一直复用已经拒绝的 Promise。
+
+- **边界**：在途去重与结果缓存是两件事。前者只覆盖任务未完成的时间，后者需要另行定义有效期和失效规则；共享任务的一个消费者离开时，也不能直接取消其他消费者仍在等待的传输。
+- **验证**：2026-10-11 在 Node.js 24.19.0 用同键并发调用验证两次调用得到同一个 Promise；第一轮拒绝并清理后，下一轮可以重新执行并成功。
+
+### `Promise.allSettled` 允许明确处理部分成功
+
+`Promise.all` 遇到任意拒绝就以拒绝结束，调用方不会得到一个完整的成功结果数组；`Promise.allSettled` 等待全部任务结束，逐项保留 `fulfilled` 或 `rejected`，便于按产品约定保留有效结果并标记失败项。
+
+- **边界**：两个组合器都不自动取消已经开始的任务；`allSettled` 也不会自动重试或把失败变成空数据。全部失败、部分失败和成功但为空，应由调用方明确区分。
+- **分批查询**：每批自行捕获错误后继续调度，汇总已成功的批次；否则循环内一次未捕获的拒绝会提前停止后续批次。
+- **共享资源收尾**：`Promise.all` 提前拒绝可以触发外层 `finally`，但其他任务仍可能使用共享资源。若首次异常应停止整批，需要分别停止领取新任务、等待已启动任务结束，再释放资源并抛出原始错误；仅换成 `allSettled` 不会阻止 worker 继续领取队列。
+- **收尾顺序验证**：2026-10-14 用可手动完成的 Promise 验证，一个任务拒绝后，`Promise.all(...).finally(cleanup)` 的清理早于另一个任务完成。
+- **验证**：2026-10-11 用独立 Node.js 实验验证一个拒绝任务和一个成功任务的结果均被保留；聚焦测试另验证一个批次失败时，后续成功批次仍能返回有效记录。
 
 ### 外层 `try/catch` 不会捕获未等待 Promise 的异步拒绝
 

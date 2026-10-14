@@ -33,7 +33,27 @@ Node.js 服务监听端口 `0` 时，由操作系统分配当前未使用的端�
 - **记忆点**：固定端口被其他进程占用时，服务通常以 `EADDRINUSE` 启动失败；端口 `0` 只保证本次绑定时由系统选择可用端口，不保证下次仍相同。
 - **来源**：[Node.js `server.listen()` 文档](https://nodejs.org/api/net.html#serverlistenport-host-backlog-callback)。
 
+## 命令行参数
+
+### 参数名合法不等于参数值被 CLI 支持
+
+允许传入 `--type` 或 `--format`，只说明参数名称合法；具体取值仍可能受当前 CLI 的枚举约束。界面选项、默认值、兜底值和命令示例都要与实际执行版本的允许值一致，不能根据显示名称猜测参数值。
+
+- **测试边界**：只记录调用参数的 mock、或只验证参数名的白名单，不能证明 CLI 会接受该值。接口测试应保留映射检查，再补充实际命令契约核验；CLI 升级后也需要重新核对。
+- **本地核验**：支持枚举诊断的 CLI 可以用无效枚举值触发参数校验，读取允许值列表；需先确认该校验在网络或业务执行之前发生。成功数据请求的实际运行结果可以进一步验证正确值，但不应把这类联网验证混入离线单测。
+- **验证**：2026-10-11 对当前本地 CLI 实测，一个界面默认值被参数解析器拒绝，使用允许的默认值后成功返回结构化结果；新增本地契约测试直接核对实际 CLI 的枚举列表，避免测试桩重复接受错误默认值。
+
 ## Workspace 与构建
+
+### ESM 依赖需要分别检查 Node、TypeScript 和 Jest
+
+Node 能加载一个 ESM 包，不代表 TypeScript 类型检查和 Jest 测试运行器也已支持同样的加载方式。
+
+- **运行时**：现代 Node 可以从 CommonJS 使用 `require()` 加载同步 ESM 模块，但模块及依赖链不能包含顶层 `await`。
+- **编译器**：TypeScript 5.8 才在 `module: nodenext` 下支持这项互操作；旧版即使配合新 Node，仍可能对编译为 `require()` 的静态导入报告 `TS1479`。`esModuleInterop` 不能代替这项版本支持。
+- **测试器**：Jest 默认跳过依赖目录的转译。CommonJS 测试导入 `lodash-es` 等 ESM 包时，可为该包开放 `transformIgnorePatterns` 并配置 JavaScript 转译；pnpm 的实际路径还经过 `.pnpm`，只匹配包名所在的一层可能仍被忽略。使用 ts-jest 转译依赖中的 JavaScript 时，需要对这项转译开启 `allowJs`。
+- **验证**：2026-10-12 在 Node 24、TypeScript 5.6、Jest 30 环境中分别复现运行时加载成功、静态导入 `TS1479`、Jest 拒绝 `export`，并验证定向转译能消除测试加载错误。
+- **来源**：[TypeScript 5.8 的 require(ESM) 支持](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-8.html#support-for-require-of-ecmascript-modules-in---module-nodenext)、[Jest 转译忽略规则及 pnpm 示例](https://jestjs.io/docs/configuration#transformignorepatterns-arraystring)。
 
 ### Monorepo 中同名 `pnpm run` 脚本取决于当前 package
 
@@ -73,6 +93,15 @@ pnpm --filter <package-name> run dev:server
 
 ## 自动化测试
 
+### Jest 全部 PASS，但进程不退出
+
+测试断言通过与测试进程正常结束是两件事；未关闭的服务器、子进程或定时器都可能继续占用事件循环。
+
+- **诊断命令**：`pnpm exec jest --detectOpenHandles`，它会尝试给出残留句柄的创建堆栈，并隐含串行运行。
+- **导入也可能有副作用**：测试为使用校验器或注册表而导入模块时，其运行时依赖仍可能在顶层启动日志上报、服务发现或定时任务；应在测试边界替换依赖，或由创建者在 teardown 关闭资源。纯 `import type` 不属于这种运行时导入。
+- **记忆点**：`--forceExit` 只能强制结束进程，不证明资源已经正确释放；`--detectOpenHandles` 有性能开销，适合排障使用。
+- **来源**：[Jest CLI 的 detectOpenHandles](https://jestjs.io/docs/cli#--detectopenhandles)；2026-10-09 本地执行验证了“全部断言通过、导入依赖的定时器仍阻止退出”的情况，未保留业务日志或标识。
+
 ### Jest 的测试入口由发现规则决定
 
 测试目录可以同时放测试入口、共享测试数据构造器和辅助脚本；文件是否作为独立测试套件运行，要看 Jest 的发现配置。
@@ -98,7 +127,27 @@ await page.locator('#settings-panel.is-collapsed').waitFor({ state: 'attached' }
 
 来源：[Playwright Locator.waitFor](https://playwright.dev/docs/api/class-locator#locator-wait-for) 定义四种等待状态；本地浏览器验证也确认零高度折叠容器会被默认可见性等待判为未就绪。核验日期：2026-09-07。
 
+### Playwright：全局 Cookie 请求头不会按登录域隔离
+
+BrowserContext 的 `extraHTTPHeaders` 作用于该上下文页面发起的每个请求。把整串 Cookie 放进去，跨主机的脚本等资源请求也可能携带它。
+
+- **适合场景**：给自动化浏览器注入登录态前，区分“浏览器 Cookie 存储”与“人为追加全局请求头”。
+- **正确边界**：需要登录 Cookie 时，用 `addCookies` 明确配置 `url`，或同时指定 `domain` 与 `path`；访问公共资源不应额外携带凭据。不需要登录态的执行链不要注入 Cookie。
+- **风险判断**：收到请求的其他服务能看到人为追加的 Cookie，凭据还可能进入其日志或监控。如果其中是有效、可重用的会话凭据，获得者可能冒用会话；是否可用仍取决于过期、撤销、设备绑定等服务端校验。HTTPS 保护传输过程，不能阻止目标服务读取自己收到的头。合成 Cookie 实验只能证明发送范围，不能据此声称真实账号已泄露。[OWASP 会话管理](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+- **验证方法**：两个本地 HTTP 服务分别使用 `127.0.0.1` 和 `localhost`，页面从另一主机加载脚本；只使用虚构 Cookie，检查脚本服务收到的请求头。
+- **来源**：[Playwright 全局请求头](https://playwright.dev/docs/api/class-browsercontext#browser-context-set-extra-http-headers)、[addCookies 的作用域参数](https://playwright.dev/docs/api/class-browsercontext#browser-context-add-cookies)；2026-10-09 用本地无头 Chrome 与合成凭据验证跨主机请求确实收到全局 Cookie 头。
+
 ## 进程与环境
+
+### Node.js `child.kill()` 不等于子进程已经退出
+
+在 POSIX 系统上，`child.kill()` 默认发送 SIGTERM；子进程可以处理该信号并继续运行。`child.killed` 为 true 只说明信号已成功发送。
+
+- **超时与取消**：父进程的 Promise 拒绝、AbortSignal 触发或超时计时结束，都不能单独证明子进程停止执行。
+- **清理策略**：向仍属于本任务的子进程请求退出，等待有限宽限期；仍未退出时按平台使用强制终止，再确认 `exit`/`close`。不要在 PID 已回收后延迟向旧号码发信号，避免命中复用的 PID。
+- **有界退出等待（bounded wait）**：为退出等待设置明确时限。比如发送 SIGTERM 后最多等 2 秒，提前退出就立即继续；超时仍存活则发送 SIGKILL，再用另一段有限等待确认退出。数字只是策略示例，不是 Node.js 默认值；最终仍未确认退出时应记录清理失败，不能无限挂住，也不能报告已清理。
+- **进程树边界**：终止直接子进程也不自动等于终止所有后代，需按任务拥有的进程树或进程组设计清理。
+- **来源**：[Node.js subprocess.kill](https://nodejs.org/api/child_process.html#subprocesskillsignal)、[subprocess.killed](https://nodejs.org/api/child_process.html#subprocesskilled)；2026-10-09 在 macOS 使用捕获 SIGTERM 的本地 Node.js 替身，分别验证了超时与 AbortSignal 返回后子进程仍存活，并在测试结束时显式清理。
 
 ### Node.js `os.userInfo().username`：当前进程的系统用户名
 

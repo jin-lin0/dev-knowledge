@@ -41,6 +41,8 @@ order: 6
 
 因此连接验证应按任务能力检查：简单文本返回、工具调用及结果回传、流式结束、图片输入、所需 JSON Schema 行为、用量统计、超时与取消。仅发送一句问候不足以证明这个连接能运行 Agent。不能把未支持参数被忽略后的结果当作同一实验条件。
 
+原生回答格式、工具参数与选择策略分别控制不同能力，具体协议区别见 [JSON Schema、Function Calling 与工具选择](/knowledge/backend/structured-output-and-tool-calling/)。
+
 被测 Agent、评分 Judge、检索或其他工具可以使用不同的服务和凭据。替换 Judge 连接只改变评分侧；用户 Key 必须实际覆盖相应服务，才能改变该部分的额度归属。
 
 ## 数据权限与额度仍由平台控制

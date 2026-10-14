@@ -19,3 +19,5 @@ order: 4
 ## 快速复习
 
 - [前端运行时与框架速记](/knowledge/frontend/quick-notes/)
+- [计算属性缓存与时间依赖](/knowledge/frontend/quick-notes/#vue-computed-不会因时间经过自动重算)
+- [自定义 Error 类与错误语义](/knowledge/frontend/quick-notes/#自定义-error-类负责携带错误语义)

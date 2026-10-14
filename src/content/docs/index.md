@@ -19,7 +19,7 @@ description: 面向长期学习与复用的个人开发知识库。
 - [Codex](/knowledge/codex/)：规则、Skills、推理模式与可复用工作流。
 - [CSS](/knowledge/css/)：文本断行、布局尺寸、滚动和原生交互。
 - [前端](/knowledge/frontend/)：框架组件、浏览器运行时、网络与性能边界。
-- [后端与数据采集](/knowledge/backend/)：数据管道、本地分析与长任务可靠性。
+- [后端与数据采集](/knowledge/backend/)：模型 API、数据管道、本地分析与长任务可靠性。
 - [工程工具与系统](/knowledge/tooling/)：本地服务、包管理、进程环境、构建与 macOS 任务。
 
 ## 推荐查找路径

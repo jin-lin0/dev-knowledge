@@ -11,6 +11,8 @@ order: 3
 
 ## 统一错误码
 
+示例中的 AppError 是携带稳定 code 的自定义 Error；它负责保存错误语义，捕获方负责处理策略，具体作用见[自定义 Error 类速记](/knowledge/frontend/quick-notes/#自定义-error-类负责携带错误语义)。
+
 网络层应该保留用户主动取消，同时把其他连接与读取异常归一化：
 
 ```ts

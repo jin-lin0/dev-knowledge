@@ -10,6 +10,20 @@ order: 3
 
 这是一份持续增长的 Codex 速记页。每个条目只保留选择设置和排查概念混淆时需要的信息。
 
+## 程序化集成与 API
+
+### Codex SDK 与 App Server
+
+程序可以通过 Codex SDK 启动、继续和恢复本地 Codex 会话；需要直接处理认证、会话历史、审批与流式事件时，可以使用 App Server。
+
+- **SDK**：官方提供 TypeScript 包 `@openai/codex-sdk` 和 Python 包 `openai-codex`。
+- **通信方式**：App Server 使用双向 JSON-RPC，默认通过标准输入输出传输。WebSocket 传输目前仍属实验性、官方不支持的能力；不能把它等同于成熟的公网 REST 服务。
+- **HTTP 接口**：若业务需要 `POST /tasks` 一类接口，可以自行增加 HTTP 服务层，由它调用 SDK 或 App Server。这是应用层封装方案，接口契约需要自行设计。
+- **模型 API 与 Agent 接口**：App Server 对外控制 Codex Agent 的会话与执行循环，不只是把请求转发给模型的反向代理，也不能直接作为标准 Responses API 的兼容地址。Responses API 的自定义函数调用通常由应用接收调用、执行函数并回传结果；Codex 还管理 Agent 的继续执行与工具交互。
+- **自定义工具调用**：App Server 支持通过 `thread/start.dynamicTools` 注册动态工具；调用发生时，客户端接收 `item/tool/call`，执行工具并回传结果。这组接口仍属实验性。它与 Codex 执行内置工具或已配置的 MCP 工具是不同的接入方式，不能把“不是模型 API”理解为“不支持 tool calling”。
+- **旧教程边界**：当前 SDK 文档说明 `codex mcp-server` 和独立的 `codex-mcp-server` 已移除，已有集成应转向 App Server。
+- **来源**：[官方 Codex SDK 文档](https://learn.chatgpt.com/docs/codex-sdk)、[官方 App Server 文档](https://learn.chatgpt.com/docs/app-server)、[Responses API 函数调用](https://developers.openai.com/api/docs/guides/function-calling)，本条核验于 2026-10-13。
+
 ## ChatGPT 网页与 Codex 的模型可用性
 
 同一个 ChatGPT 账号在网页端看到某个模型，不代表该模型会同时出现在 Codex 桌面应用、CLI、IDE 扩展或 Codex Cloud 中。各产品界面分别依据推出阶段、客户端支持、登录方式、账号权益和工作区策略计算可用模型。
