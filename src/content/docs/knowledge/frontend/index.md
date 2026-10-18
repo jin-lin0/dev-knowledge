@@ -16,6 +16,10 @@ order: 4
 - [移动端下拉浮层的视口适配](/knowledge/frontend/mobile-dropdown-overlay/)
 - [流式请求的错误提示与安全降级](/knowledge/frontend/streaming-error-fallback/)
 
+## 优化加载与运行时
+
+- [预计算查表：把固定范围的复杂计算移出运行时](/knowledge/frontend/precomputed-lookup-tables/)：用紧凑结构和累计偏移重建结果，并通过差分测试验证有限范围的行为。
+
 ## 快速复习
 
 - [前端运行时与框架速记](/knowledge/frontend/quick-notes/)

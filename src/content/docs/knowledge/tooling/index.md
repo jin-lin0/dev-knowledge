@@ -13,6 +13,7 @@ order: 6
 - **参数名合法但 CLI 仍拒绝默认值**：查看速记中的[命令行参数契约](/knowledge/tooling/quick-notes/#命令行参数)。
 - **UI 自动化等待超时、元素存在但不可见**：查看速记中的 [自动化测试](/knowledge/tooling/quick-notes/#自动化测试)。
 - **Browser、Context、Page 的区别，以及 evaluate 为什么不能读取外层变量**：[Playwright 的浏览器对象与执行环境](/knowledge/tooling/playwright-execution-boundaries/)。
+- **发布产物为什么能被逆向，伪代码和运行观察能证明什么**：[逆向工程的证据与还原边界](/knowledge/tooling/reverse-engineering-evidence/)。
 - **macOS 应用打不开、`-600` 错误、打开或保存对话框异常**：查看速记中的 [进程与环境](/knowledge/tooling/quick-notes/#进程与环境)。
 - **定时任务、登录后后台服务、休眠补跑与计划唤醒**：[macOS `launchd` 与计划任务](/knowledge/tooling/macos-launchd/)。
 

@@ -12,6 +12,10 @@ order: 5
 - [草稿与提交、执行校验](/knowledge/backend/quick-notes/#接口输入校验)：区分合法保存与业务完整，复用字段定义并避免把 `.partial()` 当作放宽已填写内容的校验。
 - [接口数据归一化与资源身份](/knowledge/backend/quick-notes/#接口数据归一化)：区分缺失数值与真实零值，保留来源限定 ID 的命名空间。
 
+## 身份认证与云资源
+
+- [Vercel 改名与 OIDC 身份联合](/knowledge/backend/quick-notes/#vercel-项目改名与-oidc-身份联合)：区分令牌声明、云端信任策略、静态密钥认证与域名引用的影响。
+
 ## 模型 API 与凭据接入
 
 - [用户自带 API Key 的模型接入边界](/knowledge/backend/byok-model-integration/)：额度归属、协议兼容、密钥托管与自定义 URL 的 SSRF 风险。
